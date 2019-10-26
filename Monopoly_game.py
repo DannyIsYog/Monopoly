@@ -250,12 +250,37 @@ class Monopoly:
             self.property_in_auction[0].owner = self.property_in_auction[2]         #Changes the owner of the property
             self.property_in_auction[2].money -= self.property_in_auction[1]        #Makes the bank transaction
             self.property_in_auction[2].props.append(self.property_in_auction[0])   #Add the property to the player owned proerties
-        self.property_in_auction = None                                         #Resets state of the game
-        self.next_plays = ['Pass']                                              #Next possible actions
+        self.property_in_auction = None                                             #Resets state of the game
+        self.next_plays = ['Pass']                                                  #Next possible actions
 
     ############################
     #Property related functions#
     ############################
+    #Buys the proprety for a player
+    def buy(self, player):
+        if 'Buy' in self.next_plays and player.place.group in Buyable_groups and player.playing == True and \
+        (player.rolled == True or player.was_doubles == True) and player.place.owner == 'Bank':
+            player.place.owner = player.name
+            player.money -= player.place.value
+            player.props.append(player.place)
+            self.next_plays.remove('Buy')
+
+    #Places a bid for the current auction
+    def bid(self, player, amount):
+        if self.property_in_auction != None:
+            if amount > self.property_in_auction[1]:
+                self.property_in_auction[1] = amount
+                self.property_in_auction[2] = player
+                print('Bid of ' + str(amount) + '$ placed on' + self.property_in_auction[0].name + ' by ' + player.name)
+            else:
+                print('You need to bid a higher value then ' + str(self.property_in_auction[1]) + '$')
+
+    #Takes out a player of the current auction
+    def pass_bid(self, player):
+        if 'Pass_bid' in self.next_plays and player in self.bidders and self.property_in_auction[2].name != player.name :
+            self.bidders.pop(self.get_iplayer(player))
+            if len(self.bidders) == 1:
+                self.end_auction()
 
     ##########################################
     #Actual game player interaction functions#
@@ -304,36 +329,6 @@ class Monopoly:
             self.players[i].rolled = False
             self.current_player = self.players[i]
             self.next_plays = ['Roll']
-
-    #Buys the proprety for a player
-    def buy(self, player):
-        if 'Buy' in self.next_plays and player.place.group in Buyable_groups and player.playing == True and \
-        (player.rolled == True or player.was_doubles == True) and player.place.owner == 'Bank':
-            player.place.owner = player.name
-            player.money -= player.place.value
-            player.props.append(player.place)
-            self.next_plays.remove('Buy')
-
-    #If the players doesnt want to buy the proprety this will handle the situation
-    def dont_buy(self, player):
-        if 'Auction' in self.next_plays:
-            place_for_auction(player)
-
-    #Places a bid for the current auction
-    def bid(self, player, amount):
-        if self.property_in_auction != None:
-            if amount > self.property_in_auction[1]:
-                self.property_in_auction[1] = amount
-                self.property_in_auction[2] = player
-                print('Bid of ' + str(amount) + '$ placed on' + self.property_in_auction[0].name + ' by ' + player.name)
-            else:
-                print('You need to bid a higher value then ' + str(self.property_in_auction[1]) + '$')
-
-    def pass_bid(self, player):
-        if 'Pass_bid' in self.next_plays and player in self.bidders and self.property_in_auction[2].name != player.name :
-            self.bidders.pop(self.get_iplayer(player))
-            if len(self.bidders) == 1:
-                self.end_auction()
 
 class Player:
     def __init__(self,name):
