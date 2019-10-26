@@ -90,6 +90,7 @@ class Monopoly:
         self.board = Board(Propertys)   #Creates the board
         self.next_plays = ['None']      #Next allowed plays
         self.property_in_auction = None #The property that is being auctioned
+        self.bidders = None             #List of players bidding
 
     ###################################
     #Group of functions to print stuff#
@@ -238,23 +239,19 @@ class Monopoly:
         if player.place.owner == 'Bank' and player.place.group in Buyable_groups:
             self.next_plays = ['Buy']
 
-    #Checks all the events that need to happend upon a player moves on the board
-    def check(self,player):
-        if player.place.owner == 'Bank' and player.place.group in Buyable_groups:
-            self.next_plays = ['Buy', 'Auction']
-        else:
-            check_non_property(player)
-
     #Places a property for auction
     def place_for_auction(self, player):
-        self.property_in_auction = (player.place, 0, 'Bank') # (property, highest bid, bidder)
+        self.property_in_auction = [player.place, 0, 'Bank'] # (property, highest bid, bidder)
+        self.bidders = [bidder for bidder in self.players]
 
     #Ends an auction
     def end_auction(self):
         if self.property_in_auction[2] != 'Bank':
-            self.property_in_auction[0].owner = self.property_in_auction[2]
-            self.property_in_auction[2].money -= self.property_in_auction[1]
-            self.property_in_auction = None
+            self.property_in_auction[0].owner = self.property_in_auction[2]         #Changes the owner of the property
+            self.property_in_auction[2].money -= self.property_in_auction[1]        #Makes the bank transaction
+            self.property_in_auction[2].props.append(self.property_in_auction[0])   #Add the property to the player owned proerties
+        self.property_in_auction = None                                         #Resets state of the game
+        self.next_plays = ['Pass']                                              #Next possible actions
 
     ############################
     #Property related functions#
@@ -293,8 +290,11 @@ class Monopoly:
 
     #Passes a players turn
     def Pass(self, player):
-        if 'Pass' in self.next_plays and self.running == True and player.playing == True and player.rolled == True: #\
-            #and self.property_in_auction == None:
+        if 'Pass' in self.next_plays and self.running == True and player.playing == True and player.rolled == True and \
+        player.place.owner == 'Bank' and player.place.group in Buyable_groups and self.property_in_auction == None:
+            self.place_for_auction(player)
+            self.next_plays = ['Bid','Pass_bid']
+        elif 'Pass' in self.next_plays and self.running == True and player.playing == True and player.rolled == True:
             player.playing = False
             player.was_doubles = False
             i = self.get_iplayer(player) + 1
@@ -304,7 +304,6 @@ class Monopoly:
             self.players[i].rolled = False
             self.current_player = self.players[i]
             self.next_plays = ['Roll']
-            #self.before_roll_check(self.players[i])
 
     #Buys the proprety for a player
     def buy(self, player):
@@ -326,8 +325,15 @@ class Monopoly:
             if amount > self.property_in_auction[1]:
                 self.property_in_auction[1] = amount
                 self.property_in_auction[2] = player
+                print('Bid of ' + str(amount) + '$ placed on' + self.property_in_auction[0].name + ' by ' + player.name)
             else:
-                print('You need to bid a higher value then ' + self.property_in_auction[1] + '$')
+                print('You need to bid a higher value then ' + str(self.property_in_auction[1]) + '$')
+
+    def pass_bid(self, player):
+        if 'Pass_bid' in self.next_plays and player in self.bidders and self.property_in_auction[2].name != player.name :
+            self.bidders.pop(self.get_iplayer(player))
+            if len(self.bidders) == 1:
+                self.end_auction()
 
 class Player:
     def __init__(self,name):
@@ -506,5 +512,9 @@ while True:
         game_1.buy(game_1.get_player(input('Player name: ')))
     elif command == 'prop': #prints all the property of a player
         dis_props(game_1.get_player(input('Player name:')))
+    elif command == 'bid':
+        game_1.bid(game_1.get_player(input('Player name:')),int(input('Bid Ammount:')))
+    elif command == 'pbid':
+        game_1.pass_bid(game_1.get_player(input('Player name:')))
     elif command == 'x': #exits the program
         break;
