@@ -145,11 +145,13 @@ class Monopoly:
             if property.name == w_property:
                 print(property.group)
 
+    #Returs the index of a property in the self.board.path
     def get_iproperty(self, property):
         i = 0
         for aproperty in self.board.path:
             if aproperty.name == property.name:
                 return i
+            i += 1
         return None
 
     ################################################
@@ -222,8 +224,26 @@ class Monopoly:
     #Moves a player on the board upon rolling dices
     def move(self, player):
         new_index = self.get_iproperty(player.place) + player.dice_sum
-        player.place = self.board.path[new_index]
-        #self.check(player)
+        player.place = self.board.path[new_index % len(self.board.path)]
+
+    #Returns a list of all properties of the type Go between two properties
+    def check_GO(self,before_prop, after_prop):
+        gos = []
+        if before_prop < after_prop:
+            path = self.board.path[before_prop+1:after_prop+1]
+        else:
+            path = self.board.path[before_prop+1:-1]
+            temp_path = self.board.path[0:after_prop+1:]
+            path += temp_path
+        for i in path:
+            if i.group == 'Go':
+                gos.append(i)
+        return gos
+
+    #Pays the player an amount of a property Go
+    def pay_Go(self,player, prop):
+        player.money += prop.amount
+        print('MONEY:' + str(player.money))
 
     #Makes all the necessary checks before the player performs a roll
     def before_roll_check(self, player):
@@ -236,8 +256,12 @@ class Monopoly:
 
     #Makes all the necessary checks after the player performs a roll
     def after_roll_check(self, player):
-        if player.place.owner == 'Bank' and player.place.group in Buyable_groups:
-            self.next_plays = ['Buy']
+        #Checks and pays if a played passed in a GO property
+        before_prop = self.get_iproperty(player.place)
+        self.move(player)
+        after_prop = self.get_iproperty(player.place)
+        for gos in self.check_GO(before_prop, after_prop):
+            self.pay_Go(player,gos)
 
     #Places a property for auction
     def place_for_auction(self, player):
@@ -277,10 +301,21 @@ class Monopoly:
 
     #Takes out a player of the current auction
     def pass_bid(self, player):
-        if 'Pass_bid' in self.next_plays and player in self.bidders and self.property_in_auction[2].name != player.name :
-            self.bidders.pop(self.get_iplayer(player))
-            if len(self.bidders) == 1:
+        if 'Pass_bid' in self.next_plays and player in self.bidders and (self.property_in_auction[2] == 'Bank' or  \
+        self.property_in_auction[2].name != player.name) :
+            self.bidders.remove(player)
+            print(self.bidders)
+            if (len(self.bidders) == 0 and self.property_in_auction[2] == 'Bank') or \
+                (len(self.bidders) == 1 and self.property_in_auction[2] != 'Bank') :
                 self.end_auction()
+    #################
+    #Debug Functions#
+    #################
+
+    def force_prison(self, player):
+        player.prison_time = 1
+        player.prison = True
+
 
     ##########################################
     #Actual game player interaction functions#
@@ -294,21 +329,24 @@ class Monopoly:
             if player.was_doubles != True:
                 player.rolled = True
                 self.next_plays = ['Pass', 'Buy']
-            self.move(player)
+            self.after_roll_check(player)
 
     #Rolls the dice for someone in prison and checks if they get out or not based on the out come
     def roll_prison(self, player):
-        if 'Roll_Prison' in self.next_plays and player.playing and player.rolled == False:
+        if 'Roll_prison' in self.next_plays and player.playing and player.rolled == False:
             self.roll_for(player)
             if player.was_doubles:
                 player.prison = False
+                self.move(player)
             else:
                 player.prison_time += 1
             self.next_plays = ['Pass']
+            if player.prison_time == 3:
+                self.next_plays = ['Pay_fine']
 
     #A player pay to leave jail next turn
     def prison_pay(self, player):
-        if 'Pay_Prison' in self.next_plays:
+        if 'Pay_fine' in self.next_plays:
             player.money -= 50
             player.prison = False
             player.prison_time = 0
@@ -329,6 +367,8 @@ class Monopoly:
             self.players[i].rolled = False
             self.current_player = self.players[i]
             self.next_plays = ['Roll']
+            if self.current_player.prison == True:
+                self.next_plays = ['Roll_prison','Pay_fine','Use_card']
 
 class Player:
     def __init__(self,name):
@@ -481,7 +521,6 @@ def dis_props(player):
     for prop in player.props:
         print(prop.name)
 
-
 #This is only for debbuging, need to create a better interface later
 while True:
     command = input()
@@ -501,6 +540,10 @@ while True:
         print(game_1.next_plays)
     elif command == 'roll': # rolls the dice for a player
         game_1.roll(game_1.get_player(input('Player name: ')))
+    elif command == 'rollp':
+        game_1.roll_prison(game_1.get_player(input('Player name: '))) #roll dice for prison
+    elif command == 'payp':
+        game_1.prison_pay(game_1.get_player(input('Player name: '))) #pays prison time
     elif command == 'pass': # passes the turn
         game_1.Pass(game_1.get_player(input('Player name: ')))
     elif command == 'buy': #buys a property
@@ -511,5 +554,7 @@ while True:
         game_1.bid(game_1.get_player(input('Player name:')),int(input('Bid Ammount:')))
     elif command == 'pbid':
         game_1.pass_bid(game_1.get_player(input('Player name:')))
+    elif command == 'debug':
+        game_1.force_prison(game_1.get_player(input('Player name:')))
     elif command == 'x': #exits the program
         break;
